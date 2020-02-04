@@ -18,6 +18,7 @@ void free_path_list(struct pathentry *head) {
 	while (head != NULL) {
 		tmp = head;
 		head = head->next;
+		tmp->next = NULL;
 		free(tmp);
 	}
 }
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
 				}
 
 				strncpy(tmp->entry, pathDir, 256);
+				tmp->next = NULL;
 			}
 		} else {
 			char search[512];
@@ -139,6 +141,9 @@ int main(int argc, char *argv[]) {
 
 		if (interactive) write(STDOUT_FILENO, "dash> ", 6);
 	}
+
+	free_path_list(path);
+	free(inLine);
 
 	return EXIT_SUCCESS;
 }
