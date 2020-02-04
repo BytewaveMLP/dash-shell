@@ -13,7 +13,7 @@ struct pathentry {
 	struct pathentry *next;
 };
 
-int main(int argc, char **argv, char **envp) {
+int main(int argc, char *argv[]) {
 	if (argc > 2) {
 		write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 		return EXIT_FAILURE;
