@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 	struct pathentry *path = malloc(sizeof(struct pathentry));
 	strcpy(path->entry, "/bin");
 	path->next = malloc(sizeof(struct pathentry));
-	strcpy(path->entry, "/usr/bin");
+	strcpy(path->next->entry, "/usr/bin");
 	path->next->next = NULL;
 
 	int interactive = 1;
