@@ -8,8 +8,7 @@
 const char ERROR_MESSAGE[30] = "An error has occurred\n";
 
 struct pathentry {
-	char *entry;
-	size_t len;
+	const char *entry;
 	struct pathentry *next;
 };
 
@@ -21,8 +20,9 @@ int main(int argc, char *argv[]) {
 
 	struct pathentry *path = malloc(sizeof(struct pathentry));
 	path->entry = "/bin";
-	path->len = 4;
-	path->next = NULL;
+	path->next = malloc(sizeof(struct pathentry));
+	path->next->entry = "/usr/bin";
+	path->next->next = NULL;
 
 	int interactive = 1;
 
@@ -66,8 +66,19 @@ int main(int argc, char *argv[]) {
 			}
 		} else {
 			char search[512];
-			snprintf(search, sizeof(search), "%s/%s", path->entry, cmd);
-			if (access(search, X_OK) == -1) {
+			struct pathentry *searchPath = path;
+			int found = 0;
+
+			while (searchPath != NULL) {
+				snprintf(search, sizeof(search), "%s/%s", searchPath->entry, cmd);
+				if (access(search, X_OK) == 0) {
+					found = 1;
+					break;
+				}
+				searchPath = searchPath->next;
+			}
+
+			if (!found) {
 				write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 			} else {
 				char** args = malloc(2 * sizeof(char*));
@@ -81,6 +92,7 @@ int main(int argc, char *argv[]) {
 					args[argN-2] = arg;
 					args[argN-1] = NULL;
 				}
+
 				pid_t child = fork();
 				if (child == -1) {
 					// fork failed
@@ -96,6 +108,7 @@ int main(int argc, char *argv[]) {
 					// wait until all child processes exit
 					while (wait(NULL) > 0);
 				}
+
 				free(args);
 			}
 		}
