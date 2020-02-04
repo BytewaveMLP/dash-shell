@@ -47,7 +47,7 @@ int main(int argc, char **argv, char **envp) {
 	if (interactive) write(STDOUT_FILENO, "dash> ", 6);
 
 	while ((nRead = getline(&inLine, &inLen, stdin)) != -1) {
-		char* cmd = strtok(inLine, " ");
+		char *cmd = strtok(inLine, " ");
 		cmd[strcspn(cmd, "\r\n")] = 0; // strip \r\n
 
 		if (strncmp(cmd, "exit", 4) == 0) {
@@ -73,13 +73,13 @@ int main(int argc, char **argv, char **envp) {
 				char** args = malloc(2 * sizeof(char*));
 				args[0] = search;
 				args[1] = NULL;
-				size_t argN = 1;
-				char* arg;
+				size_t argN = 2;
+				char *arg;
 				while ((arg = strtok(NULL, " ")) != NULL) {
 					arg[strcspn(arg, "\r\n")] = 0;
 					args = realloc(args, ++argN * sizeof(char*));
-					args[argN-1] = arg;
-					args[argN] = NULL;
+					args[argN-2] = arg;
+					args[argN-1] = NULL;
 				}
 				pid_t child = fork();
 				if (child == -1) {
@@ -93,8 +93,10 @@ int main(int argc, char **argv, char **envp) {
 					}
 				} else {
 					// we are the parent, child is executing subprogram
-					waitpid(child, NULL, 0);
+					// wait until all child processes exit
+					while (wait(NULL) > 0);
 				}
+				free(args);
 			}
 		}
 
