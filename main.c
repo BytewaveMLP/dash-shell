@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 		if (strncmp(cmd, "exit", 4) == 0) {
 			if (strtok(NULL, " ")) {
 				write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
-			} else return EXIT_SUCCESS;
+			} else break;
 		} else if (strncmp(cmd, "cd", 2) == 0) {
 			char *cdPath = strtok(NULL, "");
 			if (!cdPath) {
