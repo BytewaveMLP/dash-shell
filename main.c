@@ -40,11 +40,24 @@ void free_path_list() {
 }
 
 // trim functions adapted from https://stackoverflow.com/a/1431206/3397227
+
+/**
+ * Trim whitespace from the left of the string
+ *
+ * @param str The string to trim
+ * @return A pointer inside the original string with whitespace removed
+ */
 char *ltrim(char *str) {
 	while (isspace(*str)) str++;
 	return str;
 }
 
+/**
+ * Trim whitespace from the right of the string
+ *
+ * @param str The string to trim
+ * @return A pointer to the original string
+ */
 char *rtrim(char *str) {
 	char *back = str + strlen(str);
 	while (isspace(*--back));
@@ -52,6 +65,12 @@ char *rtrim(char *str) {
 	return str;
 }
 
+/**
+ * Trim whitespace from both ends of the string
+ *
+ * @param str The string to trim
+ * @return A pointer inside the original string with whitespace removed
+ */
 char *trim(char *str) {
 	return rtrim(ltrim(str));
 }
@@ -66,7 +85,7 @@ int exec_cmd(char rawCmd[256]) {
 	char *tokPtr = NULL;
 	char *outTokPtr = NULL;
 
-	strtok_r(rawCmd, ">", &outTokPtr);
+	strtok_r(rawCmd, ">", &outTokPtr); // discard text before the >
 	char *outputFile = strtok_r(NULL, "", &outTokPtr); // consume rest of string as output file name
 
 	int outFd = 0;
@@ -81,9 +100,8 @@ int exec_cmd(char rawCmd[256]) {
 	if (cmd == NULL) return -1;
 
 	if (strncmp(cmd, "exit", 4) == 0) {
-		if (strtok_r(NULL, " ", &tokPtr)) { // arguments passed, error out
-			return -1;
-		} else exit(0);
+		if (strtok_r(NULL, " ", &tokPtr)) return -1; // arguments passed, error out
+		else exit(0);
 	} else if (strncmp(cmd, "cd", 2) == 0) {
 		char *cdPath = strtok_r(NULL, "", &tokPtr);
 		if (!cdPath) return -1; // no arguments passed
@@ -125,8 +143,8 @@ int exec_cmd(char rawCmd[256]) {
 		if (!found) return -1;
 
 		char **args = malloc(2 * sizeof(char *));
-		args[0] = cmd;
-		args[1] = NULL;
+		args[0] = cmd; // make programs using argv[0] happy
+		args[1] = NULL; // execv needs null-terminated argv list
 		size_t argN = 2;
 		char *arg;
 		while ((arg = strtok_r(NULL, " ", &tokPtr)) != NULL) {
@@ -136,18 +154,16 @@ int exec_cmd(char rawCmd[256]) {
 		}
 
 		pid_t child = fork();
-		if (child == -1) {
-			// fork failed
-			return -1;
-		} else if (child == 0) {
+		if (child == -1) return -1; // fork failed
+		else if (child == 0) {
 			// we are the child, exec now
 			if (outputFile) {
-				close(STDOUT_FILENO);
-				dup(outFd);
+				if (dup2(outFd, STDOUT_FILENO) == -1) { // replace stdout
+					// failed to replace stdout
+					return -1;
+				}
 			}
-			if (execv(search, args) == -1) {
-				return -1;
-			}
+			if (execv(search, args) == -1) return -1;
 		}
 
 		free(args);
@@ -157,7 +173,7 @@ int exec_cmd(char rawCmd[256]) {
 }
 
 int main(int argc, char *argv[]) {
-	if (argc > 2) {
+	if (argc > 2) { // too many arguments
 		write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 		return EXIT_FAILURE;
 	}
@@ -170,11 +186,12 @@ int main(int argc, char *argv[]) {
 
 	if (argc == 2) {
 		int fd = open(argv[1], O_RDONLY);
-		if (fd == -1) {
+		if (fd == -1) { // failed to open batch file
 			write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 			return EXIT_FAILURE;
 		}
-		if (dup2(fd, STDIN_FILENO) == -1) {
+		if (dup2(fd, STDIN_FILENO) == -1) { // replace stdin
+			// failed to replace stdin
 			write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 			return EXIT_FAILURE;
 		}
@@ -184,20 +201,17 @@ int main(int argc, char *argv[]) {
 
 	char *inLine = malloc(256 * sizeof(char));
 	size_t inLen = 256;
-	ssize_t nRead = 0;
 
 	if (interactive) write(STDOUT_FILENO, PROMPT, strlen(PROMPT));
 
-	while ((nRead = getline(&inLine, &inLen, stdin)) != -1) {
+	while (getline(&inLine, &inLen, stdin) != -1) {
 		char *cmd = strtok(inLine, "&");
 
 		while (cmd) {
 			char cmdBuf[256];
 			strncpy(cmdBuf, cmd, 256);
 
-			if (exec_cmd(cmdBuf) == -1) {
-				write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
-			}
+			if (exec_cmd(cmdBuf) == -1) write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 
 			cmd = strtok(NULL, "&");
 		}
@@ -207,7 +221,7 @@ int main(int argc, char *argv[]) {
 		if (interactive) write(STDOUT_FILENO, PROMPT, strlen(PROMPT));
 	}
 
-	free_path_list(path);
+	free_path_list();
 	free(inLine);
 
 	return EXIT_SUCCESS;
