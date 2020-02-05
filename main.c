@@ -135,7 +135,6 @@ int main(int argc, char *argv[]) {
 				}
 
 				if (outFd == -1) {
-					perror("open()");
 					write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 				} else {
 					char **args = malloc(2 * sizeof(char *));
