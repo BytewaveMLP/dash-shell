@@ -3,6 +3,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <wait.h>
 
 const char ERROR_MESSAGE[30] = "An error has occurred\n";
@@ -23,6 +24,23 @@ void free_path_list(struct pathentry *head) {
 	}
 }
 
+// trim functions adapted from https://stackoverflow.com/a/1431206/3397227
+char *ltrim(char *str) {
+	while (isspace(*str)) str++;
+	return str;
+}
+
+char *rtrim(char *str) {
+	char *back = str + strlen(str);
+	while (isspace(*--back));
+	*(back+1) = '\0';
+	return str;
+}
+
+char *trim(char *str) {
+	return rtrim(ltrim(str));
+}
+
 int main(int argc, char *argv[]) {
 	if (argc > 2) {
 		write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
@@ -31,9 +49,7 @@ int main(int argc, char *argv[]) {
 
 	struct pathentry *path = malloc(sizeof(struct pathentry));
 	strcpy(path->entry, "/bin");
-	path->next = malloc(sizeof(struct pathentry));
-	strcpy(path->next->entry, "/usr/bin");
-	path->next->next = NULL;
+	path->next = NULL;
 
 	int interactive = 1;
 
@@ -58,7 +74,7 @@ int main(int argc, char *argv[]) {
 	if (interactive) write(STDOUT_FILENO, "dash> ", 6);
 
 	while ((nRead = getline(&inLine, &inLen, stdin)) != -1) {
-		inLine[strcspn(inLine, "\r\n")] = 0; // strip \r\n
+		rtrim(inLine);
 		char *cmd = strtok(inLine, " ");
 
 		if (strncmp(cmd, "exit", 4) == 0) {
@@ -108,34 +124,52 @@ int main(int argc, char *argv[]) {
 			if (!found) {
 				write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 			} else {
-				char** args = malloc(2 * sizeof(char*));
-				args[0] = search;
-				args[1] = NULL;
-				size_t argN = 2;
-				char *arg;
-				while ((arg = strtok(NULL, " ")) != NULL) {
-					args = realloc(args, ++argN * sizeof(char*));
-					args[argN-2] = arg;
-					args[argN-1] = NULL;
+				char *oldPos = cmd + strlen(cmd) + 1;
+				char *outputFile = NULL;
+				if (strchr(oldPos + 1, '>')) outputFile = strtok(NULL, ">");
+
+				int outFd = 0;
+				if (outputFile) {
+					outputFile = trim(outputFile);
+					outFd = open(outputFile, O_CREAT | O_WRONLY | O_TRUNC);
 				}
 
-				pid_t child = fork();
-				if (child == -1) {
-					// fork failed
+				if (outFd == -1) {
+					perror("open()");
 					write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
-				} else if (child == 0) {
-					// we are the child, exec now
-					if (execv(search, args) == -1) {
-						write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
-						return EXIT_FAILURE;
-					}
 				} else {
-					// we are the parent, child is executing subprogram
-					// wait until all child processes exit
-					while (wait(NULL) > 0);
-				}
+					char **args = malloc(2 * sizeof(char *));
+					args[0] = cmd;
+					args[1] = NULL;
+					size_t argN = 2;
+					char *arg;
+					while ((arg = strtok(oldPos, " ")) != NULL) {
+						args = realloc(args, ++argN * sizeof(char *));
+						args[argN - 2] = arg;
+						args[argN - 1] = NULL;
+						oldPos = NULL;
+					}
 
-				free(args);
+					pid_t child = fork();
+					if (child == -1) {
+						// fork failed
+						write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
+					} else if (child == 0) {
+						// we are the child, exec now
+						if (outputFile) {
+							close(STDOUT_FILENO);
+							dup(outFd);
+						}
+						if (execv(search, args) == -1) {
+							write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
+							return EXIT_FAILURE;
+						}
+					}
+
+					while (wait(NULL) > 0);
+
+					free(args);
+				}
 			}
 		}
 
