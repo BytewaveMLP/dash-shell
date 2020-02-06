@@ -15,7 +15,7 @@
 const char ERROR_MESSAGE[30] = "An error has occurred\n";
 const char PROMPT[10] = "dash> ";
 
-#define PATH_ENTRY_SIZE 256
+#define PATH_ENTRY_SIZE 4096
 
 /**
  * Linked list structure for storing the command search path
@@ -128,13 +128,17 @@ int exec_cmd(char *rawCmd) {
 		}
 	} else {
 		// execute general command
-		char search[PATH_ENTRY_SIZE * 2];
+		char search[PATH_ENTRY_SIZE * 2 + 2];
+		search[0] = '\0';
 		struct pathentry *searchPath = path;
 		int found = 0;
 
 		// iterate over path list
 		while (searchPath != NULL) {
-			snprintf(search, sizeof(search), "%s/%s", searchPath->entry, cmd);
+			strncat(search, searchPath->entry, PATH_ENTRY_SIZE);
+			strncat(search, "/", 1);
+			strncat(search, cmd, PATH_ENTRY_SIZE);
+
 			if (access(search, X_OK) == 0) {
 				found = 1;
 				break;
@@ -220,10 +224,6 @@ int main(int argc, char *argv[]) {
 		}
 
 		while (wait(NULL) > 0); // wait for children to exit
-
-		free(inLine);
-		inLine = NULL;
-		inLen = 0;
 
 		if (interactive) write(STDOUT_FILENO, PROMPT, strlen(PROMPT));
 	}
