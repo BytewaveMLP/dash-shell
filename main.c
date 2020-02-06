@@ -15,11 +15,13 @@
 const char ERROR_MESSAGE[30] = "An error has occurred\n";
 const char PROMPT[10] = "dash> ";
 
+#define PATH_ENTRY_SIZE 256
+
 /**
  * Linked list structure for storing the command search path
  */
 struct pathentry {
-	char entry[256];
+	char entry[PATH_ENTRY_SIZE];
 	struct pathentry *next;
 };
 
@@ -81,7 +83,7 @@ char *trim(char *str) {
  * @param rawCmd The command string to execute
  * @return 0 on success, -1 on error
  */
-int exec_cmd(char rawCmd[256]) {
+int exec_cmd(char *rawCmd) {
 	char *tokPtr = NULL;
 	char *outTokPtr = NULL;
 
@@ -121,12 +123,12 @@ int exec_cmd(char rawCmd[256]) {
 				tmp = tmp->next;
 			}
 
-			strncpy(tmp->entry, pathDir, 256);
+			strncpy(tmp->entry, pathDir, PATH_ENTRY_SIZE);
 			tmp->next = NULL;
 		}
 	} else {
 		// execute general command
-		char search[512];
+		char search[PATH_ENTRY_SIZE * 2];
 		struct pathentry *searchPath = path;
 		int found = 0;
 
@@ -200,8 +202,8 @@ int main(int argc, char *argv[]) {
 		interactive = 0; // set batch mode
 	}
 
-	char *inLine = malloc(256 * sizeof(char));
-	size_t inLen = 256;
+	char *inLine = NULL;
+	size_t inLen = 0;
 
 	if (interactive) write(STDOUT_FILENO, PROMPT, strlen(PROMPT));
 
@@ -209,15 +211,19 @@ int main(int argc, char *argv[]) {
 		char *cmd = strtok(inLine, "&");
 
 		while (cmd) {
-			char cmdBuf[256];
-			strncpy(cmdBuf, cmd, 256);
+			char cmdBuf[inLen];
+			strncpy(cmdBuf, cmd, inLen);
 
 			if (exec_cmd(cmdBuf) == -1) write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 
 			cmd = strtok(NULL, "&");
 		}
 
-		while (wait(NULL) > 0);
+		while (wait(NULL) > 0); // wait for children to exit
+
+		free(inLine);
+		inLine = NULL;
+		inLen = 0;
 
 		if (interactive) write(STDOUT_FILENO, PROMPT, strlen(PROMPT));
 	}
