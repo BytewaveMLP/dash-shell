@@ -185,8 +185,9 @@ int main(int argc, char *argv[]) {
 	int interactive = 1;
 
 	if (argc == 2) {
-		int fd = open(argv[1], O_RDONLY);
-		if (fd == -1) { // failed to open batch file
+		int fd;
+		if ((fd = open(argv[1], O_RDONLY)) == -1) { // open batch file
+			// failed to open batch file
 			write(STDERR_FILENO, ERROR_MESSAGE, strlen(ERROR_MESSAGE));
 			return EXIT_FAILURE;
 		}
@@ -196,7 +197,7 @@ int main(int argc, char *argv[]) {
 			return EXIT_FAILURE;
 		}
 
-		interactive = 0; // batch mode
+		interactive = 0; // set batch mode
 	}
 
 	char *inLine = malloc(256 * sizeof(char));
